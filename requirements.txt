@@ -1,0 +1,11 @@
+# StarCraft II RL Environment Requirements
+pysc2>=4.0.0
+numpy>=1.10
+absl-py>=0.1.0
+protobuf==3.20.3  # Required for compatibility with pysc2
+
+# Optional: Additional RL frameworks
+# torch>=2.0.0
+# stable-baselines3>=2.0.0
+# tensorboard>=2.0.0
+
