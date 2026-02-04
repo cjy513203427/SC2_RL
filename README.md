@@ -1,105 +1,56 @@
-# StarCraft II Reinforcement Learning Environment
+# 星际争霸2强化学习（PySC2）实验项目
 
-This project sets up a reinforcement learning environment for StarCraft II using PySC2.
+本项目基于 [PySC2](https://github.com/google-deepmind/pysc2) 在 StarCraft II 的 mini-games 上做强化学习实验，目前已完成 **MoveToBeacon 的表格型 Q-learning**（含训练与评估脚本）。
 
-## Prerequisites
-
-- StarCraft II installed on Windows (default installation path)
-- Conda/Miniconda installed
-
-## Setup Instructions
-
-### 1. Create and Activate Conda Environment
+## 快速开始
 
 ```bash
-conda create -n sc2_rl python=3.10 -y
 conda activate sc2_rl
+cd D:\Cursor_project\SC2_RL
+python test_sc2_env.py --norender
 ```
 
-### 2. Install Dependencies
+训练 Q-learning（无渲染）：
 
 ```bash
-pip install -r requirements.txt
+python mini_games_experiment/MoveToBeacon_1_Qlearning.py --episodes=500 --norender
 ```
 
-Or install PySC2 directly:
+评估（只跑策略，不学习）：
 
 ```bash
-pip install pysc2
+python mini_games_experiment/evaluate_qlearning.py --episodes=50 --norender --model_path=models/qlearning_movetobeacon.pkl
 ```
 
-### 3. Configure SC2 Path
+## 文档（统一放在 docs/）
 
-Run the setup script to configure the StarCraft II installation path:
+- **快速开始**：`docs/快速开始.md`
+- **环境配置**：`docs/环境配置说明.md`
+- **Q-learning 实验说明**：`docs/qlearning/Qlearning说明.md`
+- **博客园文章草稿**：`docs/blog/重温星际2强化学习QLearning(一).md`
+- **初始化记录**：`docs/初始化记录.md`
+- **计划**：`docs/计划.md`
 
-```bash
-python setup_sc2_env.py
-```
+## 代码入口
 
-This script will:
-- Detect your SC2 installation path
-- Set the `SC2PATH` environment variable
-- Verify the installation
+- **训练**：`mini_games_experiment/MoveToBeacon_1_Qlearning.py`\n  - 会更新 Q 表并保存到 `models/`\n  - 训练阶段会使用探索（epsilon 衰减）与可选的奖励塑形（dense feedback）
+- **评估**：`mini_games_experiment/evaluate_qlearning.py`\n  - 只加载 Q 表，不更新（`learning_rate=0`，默认 `epsilon=0` 贪婪策略）\n  - 用于客观测量 EnvReward
+- **Agent 实现**：`mini_games_experiment/qlearning_agent.py`\n  - 存放 Q-learning 更新与状态/动作抽象（避免脚本间 flags 冲突）
 
-### 4. Test the Environment
-
-Run the test script to verify everything is working:
-
-```bash
-python test_sc2_env.py
-```
-
-Options:
-- `--render`: Enable/disable game rendering (default: True)
-- `--screen_size`: Screen resolution (default: 84)
-- `--minimap_size`: Minimap resolution (default: 64)
-
-Example:
-```bash
-python test_sc2_env.py --render --screen_size=84 --minimap_size=64
-```
-
-## Project Structure
+## 项目结构（概览）
 
 ```
 SC2_RL/
-├── README.md                 # This file
-├── requirements.txt          # Python dependencies
-├── setup_sc2_env.py         # SC2 path configuration script
-├── test_sc2_env.py          # Environment test script
-└── story initialization.md   # Project initialization notes
+├── README.md
+├── docs/
+├── mini_games_experiment/
+├── requirements.txt
+├── setup_sc2_env.py
+├── download_maps.py
+├── test_sc2_env.py
+└── simple_agent.py
 ```
 
-## Next Steps
 
-After successful setup, you can:
 
-1. **Explore PySC2 APIs**: Learn about observation space, action space
-2. **Implement RL Agents**: Use algorithms like DQN, A3C, PPO
-3. **Train on Different Maps**: Test various SC2 mini-games and maps
-4. **Integrate RL Frameworks**: Add PyTorch/TensorFlow with Stable-Baselines3
-
-## Common Issues
-
-### SC2 Not Found
-If the setup script can't find SC2:
-- Verify SC2 is installed at `C:\Program Files (x86)\StarCraft II` or similar
-- Manually set environment variable: `set SC2PATH=C:\path\to\StarCraft II`
-
-### Map Not Found
-If you get map errors:
-- Download required maps from the [SC2 Map Pack](https://github.com/Blizzard/s2client-proto#map-packs)
-- Place maps in: `%SC2PATH%\Maps\`
-
-### Version Mismatch
-If you get version errors:
-- Check your SC2 version matches PySC2 requirements
-- Update SC2 through Battle.net launcher
-
-## Resources
-
-- [PySC2 GitHub](https://github.com/google-deepmind/pysc2)
-- [PySC2 Documentation](https://github.com/google-deepmind/pysc2/blob/master/docs/environment.md)
-- [SC2 API](https://github.com/Blizzard/s2client-proto)
-- [SC2LE](https://deepmind.com/blog/article/deepmind-and-blizzard-open-starcraft-ii-ai-research-environment)
 
