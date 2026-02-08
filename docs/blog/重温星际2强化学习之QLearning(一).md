@@ -71,9 +71,16 @@ $$
 
 本项目把可复用逻辑放在一个文件里，避免脚本间 flags 冲突。
 
-- **Agent（核心逻辑）**：`mini_games_experiment/qlearning_agent.py`\n  - 状态提取、动作选择、Q 值更新、epsilon 衰减、保存/加载 Q 表
-- **训练脚本**：`mini_games_experiment/MoveToBeacon_1_Qlearning.py`\n  - 创建环境\n  - 循环训练 episodes\n  - 定期保存 Q 表与统计数据
-- **评估脚本**：`mini_games_experiment/evaluate_qlearning.py`\n  - 加载训练好的 Q 表\n  - 关闭学习（`learning_rate=0`）\n  - 统计多局平均 EnvReward
+- **Agent（核心逻辑）**：`mini_games_experiment/qlearning_agent.py`
+  - 状态提取、动作选择、Q 值更新、epsilon 衰减、保存/加载 Q 表
+- **训练脚本**：`mini_games_experiment/MoveToBeacon_1_Qlearning.py`
+  - 创建环境
+  - 循环训练 episodes
+  - 定期保存 Q 表与统计数据
+- **评估脚本**：`mini_games_experiment/evaluate_qlearning.py`
+  - 加载训练好的 Q 表
+  - 关闭学习（`learning_rate=0`）
+  - 统计多局平均 EnvReward
 
 ## 6. 训练与评估命令
 
@@ -95,13 +102,112 @@ python mini_games_experiment/evaluate_qlearning.py --episodes=50 --norender --mo
 python mini_games_experiment/evaluate_qlearning.py --episodes=10 --render --model_path=models/qlearning_movetobeacon.pkl
 ```
 
-## 7. 指标怎么看（简版）
+## 7. 指标怎么看（详细版）
 
-训练日志里你会看到：
-- **EnvReward**：真实环境奖励（最重要），在 200 步里吃到 beacon 的次数
-- **Shaped**：塑形后的累计奖励，仅用于训练参考
-- **Epsilon**：探索率（从大到小衰减）
-- **Q-table size**：已访问的 (state, action) 数量（相对状态通常千级）
+训练日志会打印类似这一行（每 10 个 episode 打印一次）：
+
+```
+Episode  500/500 | EnvReward:    4.0 | Shaped:    5.00 | Avg(20):    6.9 | Steps:  200 | Epsilon: 0.0100 | Q-table size: 1413
+```
+
+下面逐项解释，并说明**这些数到底怎么来的**、怎么判断“训练变好了”。
+
+### 7.1 EnvReward（真实环境奖励，最重要）
+
+**它是什么**：PySC2 环境返回的真实奖励（MoveToBeacon 中通常是碰到 beacon 得 +1）。  
+**它怎么统计**：每一步的 `obs.reward` 累加成一局的总和：
+
+$$
+\text{EnvReward}_\text{episode}=\sum_{t=1}^{T} r_t
+$$
+
+在代码里对应 `qlearning_agent.py`：`env_reward = float(obs.reward)`，然后 `self.total_env_reward += env_reward`。
+
+**怎么解读**：
+- **越大越好**：表示一局（最多 200 步）里吃到 beacon 的次数更多。
+- **评估以它为准**：训练时即使开了奖励塑形（Shaped），最后能力是否真的提升，要看 `EnvReward`（尤其是 `evaluate_qlearning.py` 的统计）。
+
+### 7.2 Shaped（塑形奖励，用于“更快学”，不用于对外评估）
+
+**它是什么**：在 `EnvReward` 基础上加了“距离变近就给一点正反馈”的密集奖励，形式是：
+
+$$
+\text{Shaped}_t = r_t + \lambda \cdot (d_{t-1}-d_t)
+$$
+
+- $d_t$：marine 与 beacon 的欧氏距离
+- $\lambda$：`distance_reward_scale`（默认 0.02）
+
+代码里对应 `qlearning_agent.py`：
+- `shaped_reward = env_reward`
+- 若开启 `reward_shaping=True` 且能算出距离，则 `shaped_reward += scale*(prev_dist - curr_dist)`
+- `self.total_shaped_reward += shaped_reward`
+
+**怎么解读**：
+- **只作为训练过程参考**：不同塑形系数/不同状态表示下，`Shaped` 的绝对值不可横比。
+- 你可以看它是否大体随训练上升、是否比 `EnvReward` 更平滑（通常会更平滑）。
+
+### 7.3 Avg(20) / Average reward（最近 20 局的滑动平均）
+
+你日志里的 `Avg(20)` 指的是：**最近 20 局（不足 20 局则用已有的局数）的 EnvReward 平均值**。
+
+训练中计算方式（`MoveToBeacon_1_Qlearning.py`）是：
+- `window_size = min(20, len(episode_rewards))`
+- `avg_reward = mean(episode_rewards[-window_size:])`
+
+用公式写就是：
+
+$$
+\text{Avg}(20)_k=\frac{1}{W}\sum_{i=k-W+1}^{k}\text{EnvReward}_i,\quad W=\min(20,k)
+$$
+
+训练结束时打印的：
+- `Average reward (last 20 episodes)`：固定取最后 20 局 `EnvReward` 的均值（当总局数 ≥ 20 时）
+
+**怎么解读**：
+- **看趋势，不看单点**：单局 EnvReward 波动很大，`Avg(20)` 更能反映策略是否真的变好。
+- **有用的判断标准**：`Avg(20)` 持续上升并趋于稳定，基本说明学习有效；如果长期贴近 0，通常是状态/动作抽象或奖励设计有问题。
+
+### 7.4 Steps / Average steps（每局步数）
+
+**它是什么**：一局走了多少 step（你的脚本里每次 `agent.step()` 会 `self.steps += 1`）。  
+**为什么经常是 200**：`MoveToBeacon_1_Qlearning.py` 里有 `max_steps`（默认 200），即便 agent 表现很好，通常也会跑满时间上限，所以 `Steps` 很常见一直是 200。
+
+**怎么解读**：
+- 在这个任务里 **Steps 不是关键指标**，更应该看 `EnvReward` / `Avg(20)`。
+- 如果你改了逻辑让“吃到 beacon 就提前结束”，那 Steps 才会有更明显意义（更少步数代表更快完成）。
+
+### 7.5 Epsilon（探索率）
+
+**它是什么**：epsilon-greedy 的探索概率。每一步：
+- 以概率 $\epsilon$ 随机选动作
+- 以概率 $(1-\epsilon)$ 选当前 Q 值最大的动作
+
+脚本里每个 episode 结束后衰减一次：
+
+$$
+\epsilon \leftarrow \max(\epsilon_\text{end},\epsilon\cdot \epsilon_\text{decay})
+$$
+
+**怎么解读**：
+- 训练前期 $\epsilon$ 大：多探索，Q 表填得快但回报波动大
+- 后期 $\epsilon$ 小：更像“按学到的策略执行”，`Avg(20)` 往往更稳定
+
+### 7.6 Q-table size（Q 表规模）
+
+**它是什么**：`q_table` 里已访问过的 `(state, action)` 键值对数量（字典条目数）。  
+**它怎么来的**：每次更新/访问都会让某些 `(s,a)` 出现在表里，所以它随探索增长。
+
+**怎么解读**：
+- **相对状态**（默认 \(s=(dx,dy)\)）会把状态空间压得很小，所以规模通常是**千级**（你示例里 1413）。
+- 如果你换成**绝对状态**或更细网格，Q 表可能迅速变成**万级/十万级**，学习会慢很多、也更容易稀疏。
+
+### 7.7 Best episode reward（单局最好成绩）
+
+**它是什么**：所有 episode 里最大的 `EnvReward`。  
+**怎么解读**：它能说明“最好能达到多高”，但容易是偶然性；通常更关注 `Avg(20)` 和评估集平均值。
+
+> 实战建议：判断“是否真的学会了”，优先跑 `evaluate_qlearning.py`（关闭学习与塑形），看多局平均 `EnvReward`，比训练日志更可靠。
 
 ## 8. 关键矩阵 / 数据结构的维度（对应当前实现）
 
