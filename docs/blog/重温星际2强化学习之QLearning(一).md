@@ -1,7 +1,7 @@
 # 重温星际2强化学习QLearning(一)
 
 > 本文记录我在 StarCraft II（PySC2）mini-game **MoveToBeacon** 上重温表格型 Q-learning 的过程：从问题抽象到代码落地，再到训练指标的理解。  
-> 项目源码目录：`D:\Cursor_project\SC2_RL`
+> 项目源码：[https://github.com/cjy513203427/SC2_RL](https://github.com/cjy513203427/SC2_RL)
 
 ## 1. 为什么从 MoveToBeacon 开始
 
@@ -12,9 +12,9 @@
 
 mini-games 把问题简化得非常“可控”。其中 **MoveToBeacon** 只需要学习一件事：**控制 marine 移动到 beacon**，每次碰到 beacon 都有 +1 奖励，非常适合用来复习 Q-learning 的闭环。
 
-## 2. 环境准备（最短路径）
+## 2. 快速开始 (Quick Start)
 
-详细环境配置见：`docs/环境配置说明.md`。这里给最短命令：
+详细环境配置见：`docs/环境配置说明.md`。这里提供最简运行命令：
 
 ```bash
 conda activate sc2_rl
@@ -102,7 +102,7 @@ python mini_games_experiment/evaluate_qlearning.py --episodes=50 --norender --mo
 python mini_games_experiment/evaluate_qlearning.py --episodes=10 --render --model_path=models/qlearning_movetobeacon.pkl
 ```
 
-## 7. 指标怎么看（详细版）
+## 7. 训练指标详细解读
 
 训练日志会打印类似这一行（每 10 个 episode 打印一次）：
 
@@ -209,7 +209,7 @@ $$
 
 > 实战建议：判断“是否真的学会了”，优先跑 `evaluate_qlearning.py`（关闭学习与塑形），看多局平均 `EnvReward`，比训练日志更可靠。
 
-## 8. 关键矩阵 / 数据结构的维度（对应当前实现）
+## 8. 核心数据结构与维度说明
 
 下面这些“矩阵/数组/表”是你在实现和调参时最常关心的维度信息（默认 `screen_size=84`、`minimap_size=64`、`grid_size=8`、`action_mode=delta`）。
 
@@ -251,7 +251,7 @@ Q 表是一个字典（严格来说是 `defaultdict(float)`），不是二维矩
 - `q_values = [Q(s,0), Q(s,1), ..., Q(s,num_actions-1)]`  
   - delta 模式下维度就是 **(9, )**
 
-## 8. 小结与下一篇
+## 9. 小结与后续计划
 
 这一篇完成了 Q-learning 的“从公式到代码闭环”。下一篇打算做两件事：
 - 用更合理的状态表示（例如加入速度/方向，或更细粒度网格）
